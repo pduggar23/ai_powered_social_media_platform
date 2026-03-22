@@ -107,6 +107,14 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
+    - name: Check Docker Hub Credentials
+      run: |
+        if [ -z "${{ secrets.DOCKER_USERNAME }}" ] || [ -z "${{ secrets.DOCKER_PASSWORD }}" ]; then
+          echo "::warning::Docker Hub secrets are not configured. Skipping build."
+          echo "Add DOCKER_USERNAME and DOCKER_PASSWORD in GitHub repo Settings → Secrets → Actions."
+          exit 1
+        fi
+
     - name: Checkout Code
       uses: actions/checkout@v4
 
@@ -149,8 +157,7 @@ jobs:
     - name: Validate Kubernetes Manifests
       run: |
         echo "🔍 Validating Kubernetes manifests..."
-        for file in k8s/*.yaml; do
-          echo "  ✓ Validating $file"
-          kubectl apply --dry-run=client -f "$file" 2>&1 || exit 1
-        done
+        echo "  Found $(ls k8s/*.yaml | wc -l) manifest files:"
+        ls k8s/*.yaml | while read f; do echo "    - $f"; done
+        kubectl apply --dry-run=client -f k8s/ 2>&1
         echo "✅ All manifests are valid!"
