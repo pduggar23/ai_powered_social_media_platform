@@ -140,6 +140,7 @@ jobs:
 
   # ============================================================
   # STAGE 4: Validate — Validate Kubernetes manifests
+  # Uses kubeconform for offline validation (no cluster needed)
   # ============================================================
   validate-k8s:
     runs-on: ubuntu-latest
@@ -149,15 +150,19 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Install kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'v1.28.0'
+    - name: Install kubeconform
+      run: |
+        curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz | tar xz
+        sudo mv kubeconform /usr/local/bin/
 
     - name: Validate Kubernetes Manifests
       run: |
         echo "🔍 Validating Kubernetes manifests..."
         echo "  Found $(ls k8s/*.yaml | wc -l) manifest files:"
         ls k8s/*.yaml | while read f; do echo "    - $f"; done
-        kubectl apply --dry-run=client -f k8s/ 2>&1
+        echo ""
+        kubeconform -summary -strict \
+          -kubernetes-version 1.28.0 \
+          -output text \
+          k8s/
         echo "✅ All manifests are valid!"
