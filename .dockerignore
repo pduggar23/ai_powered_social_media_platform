@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Docker
+docker-compose.yml
+docker-compose*.yml
+
+# Kubernetes
+k8s/
+
+# CI/CD
+.github/
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+
+# IDE
+.vscode/
+.idea/
+
+# Docs
+README.md
+*.md
+
+# Media (in prod, this is a persistent volume)
+media_data/
+
+# Env files
+.env

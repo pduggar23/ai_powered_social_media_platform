@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: twitter-clone-config
+  namespace: twitter-clone
+  labels:
+    app: twitter-clone
+data:
+  # --- Database ---
+  DB_NAME: "twitter_db"
+  DB_USER: "twitter_user"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+
+  # --- Redis ---
+  REDIS_HOST: "redis-service"
+
+  # --- Django ---
+  DEBUG: "False"
+  DJANGO_SETTINGS_MODULE: "backend.settings"
+  ALLOWED_HOSTS: "*"

@@ -1,7 +1,20 @@
 version: '3.8'
 
 services:
-  # 1. The Django Web Server
+  # 1. Nginx — Reverse Proxy & Load Balancer (entry point)
+  nginx:
+    build: ./nginx
+    ports:
+      - "80:80"
+    depends_on:
+      web:
+        condition: service_healthy
+    volumes:
+      - static_data:/app/static
+      - ./media_data:/app/media
+    restart: unless-stopped
+
+  # 2. The Django Web Server (behind Nginx)
   web:
     build: .
     ports:
@@ -9,16 +22,26 @@ services:
     volumes:
       - .:/app
       - ./media_data:/app/media
+      - static_data:/app/static
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     command: >
       sh -c "python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
 
-  # 2. The Database
+  # 3. The Database (PostgreSQL)
   db:
     image: postgres:15
     environment:
@@ -27,12 +50,24 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
-  # 3. The Message Broker (Cache)
+  # 4. The Message Broker (Redis)
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
-  # 4. The Background Worker (AI/Tasks)
+  # 5. The Background Worker (Celery — AI/Tasks)
   celery:
     build: .
     command: celery -A backend worker -l info
@@ -42,10 +77,13 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
-  # 5. Prometheus (Data Collector)
+  # 6. Prometheus (Metrics Collector)
   prometheus:
     image: prom/prometheus
     volumes:
@@ -54,8 +92,9 @@ services:
       - "9090:9090"
     depends_on:
       - web
+    restart: unless-stopped
 
-  # 6. Grafana (Dashboard UI)
+  # 7. Grafana (Monitoring Dashboard)
   grafana:
     image: grafana/grafana
     ports:
@@ -64,6 +103,8 @@ services:
       - prometheus
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  static_data:

@@ -1,0 +1,59 @@
+# -------------------------------------------------------------------
+# Celery Worker Deployment — runs background tasks (AI classification,
+# content moderation, image resizing, notifications).
+# Separate from the API so workers can scale independently.
+# -------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: twitter-clone
+  labels:
+    app: celery-worker
+    tier: worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+        tier: worker
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: celery
+          image: prassunduggar/twitter-clone-api:latest
+          imagePullPolicy: Always
+          command: ["celery", "-A", "backend", "worker", "-l", "info", "--concurrency=4"]
+          envFrom:
+            - configMapRef:
+                name: twitter-clone-config
+            - secretRef:
+                name: twitter-clone-secrets
+          resources:
+            requests:
+              memory: "512Mi"    # Higher memory for TensorFlow model loading
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1500m"
+          # Celery worker health check using celery inspect ping
+          livenessProbe:
+            exec:
+              command:
+                - "celery"
+                - "-A"
+                - "backend"
+                - "inspect"
+                - "ping"
+                - "--timeout"
+                - "10"
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 3

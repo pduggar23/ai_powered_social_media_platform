@@ -178,6 +178,20 @@ REDIS_HOST = os.environ.get('REDIS_HOST', 'redis')
 CELERY_BROKER_URL = f'redis://{REDIS_HOST}:6379/0'
 CELERY_RESULT_BACKEND = f'redis://{REDIS_HOST}:6379/0'
 
+# --- REDIS CACHE BACKEND ---
+# Used for caching tweet feed, reducing DB queries under load.
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:6379/1",  # DB 1 (separate from Celery's DB 0)
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+        "KEY_PREFIX": "twitter",
+        "TIMEOUT": 60,  # Default TTL: 60 seconds
+    }
+}
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -191,7 +205,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [({REDIS_HOST}, 6379)], # "redis" is the docker service name
+            "hosts": [(REDIS_HOST, 6379)], # "redis" is the docker service name
         },
     },
 }
